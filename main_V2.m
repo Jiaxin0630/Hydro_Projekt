@@ -75,6 +75,60 @@ plot(data.Raw.Atmos.time(idx), data.Raw.Atmos.cor(idx),'LineWidth',2,'Color','b'
 ylabel('Tide \muGal')
 title('The influence of atmospheric pressure','FontSize',20)
 
+%% Find own atmospheric factor
+%remove trend
+p=polyfit(datenum(final.time)-datenum(final.time(1)),final.gravity_values(:,1),1);
+D=polyval(p,datenum(final.time)-datenum(final.time(1)));
+final.gravity_alternative(:,1)=final.gravity_values(:,1)-D;
+p=polyfit(datenum(final.time)-datenum(final.time(1)),final.gravity_values(:,2),1);
+D=polyval(p,datenum(final.time)-datenum(final.time(1)));
+final.gravity_alternative(:,2)=final.gravity_values(:,2)-D;
+
+figure()
+plot(final.time,final.gravity_alternative(:,1))
+hold on
+plot(final.time,final.gravity_alternative(:,2))
+hold off
+legend({'G1-F60','G2-F60'})
+%xlabel('time [d]')
+ylabel('gravity values [\muGal]')
+axis tight
+
+mp=mean(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900));
+mg1=mean(final.gravity_alternative(data.Raw.SG.Br2_F60>900,1));
+mg2=mean(final.gravity_alternative(data.Raw.SG.Br2_F60>900,2));
+figure()
+scatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_alternative(data.Raw.SG.Br2_F60>900,1)-mg1,1,'filled')
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+figure()
+scatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_alternative(data.Raw.SG.Br2_F60>900,2)-mg2,1,'filled')
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+
+%density plot, needs Flow Cytometry Data Reader and Visualisation
+figure()
+col=dscatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_alternative(data.Raw.SG.Br2_F60>900,1)-mg1);
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+figure()
+dscatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_alternative(data.Raw.SG.Br2_F60>900,2)-mg2);
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+
+%do an actual fucking adjustment
+A=[data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)];
+y=final.gravity_alternative(data.Raw.SG.Br2_F60>900,1)-mg1;
+xhat=(A'*(1./col.*A))\A'*(1./col.*y);
+
 %% correcting the influence of atmospheric pressure
 data.Gravity_cal1Tides1Atmos1.time = data.Raw.SG.time;
 final.gravity_values(:,1) = final.gravity_values(:,1) - data.Raw.Atmos.cor;
@@ -86,11 +140,10 @@ idx=isnan(final.gravity_values(:,1));
 %data_G1 = data.Gravity_cal1Tides1Atmos1.G1_F60;
 %data_G2 = data.Gravity_cal1Tides1Atmos1.G2_F60;
 
-figure()
+figure(4)
 plot(final.time(~idx),final.gravity_values(~idx,1)-mean(final.gravity_values(~idx,1)))
 hold on
 plot(final.time(~idx),final.gravity_values(~idx,2)-mean(final.gravity_values(~idx,2)))
-hold off
 legend({'G1-F60','G2-F60'})
 %xlabel('time [d]')
 ylabel('gravity values [\muGal]')
@@ -99,61 +152,38 @@ title('Calibrated gravity values in \muGal after removing atmospheric influence'
 %axis([-inf inf -15 14])
 
 %% Remaining tide frequencies
-%periods
-T = [1 0.5 1+50/60/24 (1+50/60/24)/2 167 334];
-T=[1];
-%figure()
-% Y = fft(final.gravity_values(~idx,1));
-% frequency = 1;
-% T=1/frequency;
-% L=length(final.gravity_values(~idx,1));
-% t=(0:L-1)*T;
-% P2=abs(Y/L);
-% P1 = P2(1:L/2+1);
-% P1(2:end-1) = 2*P1(2:end-1);
-% f = frequency*(0:(L/2))/L;
-% semilogy(f*60*24,P1)
-% xlabel('frequency [cpd]')
-% ylabel('power')
-% axis([0 10 1e-3 1])
-t = datenum(data.Gravity_cal1Tides1.time(~idx) )- datenum(data.Gravity_cal1Tides1.time(1) );
-[P,f]=plomb(final.gravity_values(~idx,1),t);
+%g = fittype('a*sin(2*pi*t+phi)',...
+%            'problem','a','problem','phi',...
+%            'independent','t');
+x=datenum(final.time(~idx));
+y=final.gravity_values(~idx,1)-mean(final.gravity_values(~idx,1));
+g = fittype('a*sin(2*pi*x+b)',...
+    'dependent',{'y'},'independent',{'x'},...
+    'coefficients',{'a','b'});
+myfit = fit(datenum(final.time(~idx)),final.gravity_values(~idx,1),g);
+figure()
+plot(x,myfit(x),x,y)
+[P,f]=plomb(y-myfit(x),x);
 figure()
 semilogy(f,P)
-axis([0 5 0 inf])
+axis([0 5 -inf inf])
 xlabel('frequency [cpd]')
 ylabel('power spectral density')
-for j =1:1
-y=final.gravity_values(~idx,j);
-for i = 1:length(T)
-    phi = 0;
-a = 0.3;
-x=[phi; a];
-M=zeros(length(y),1);
-A=zeros(length(y),2);
-while true
-    for i = 1:length(y)
-        M(i)=sin(2*pi*t(i)+phi);
-        A(i,1)=cos(2*pi*t(i)+phi)*a;
-        A(i,2)=sin(2*pi*t(i)+phi);
-    end
-    dy=y-M*a;
-    dx=inv(A'*A)*A'*dy;
-    xhat=x+dx;
-    if(norm(dx)<1e-10)
-        break
-    else
-        x;
-        x=xhat;
-        phi=x(1);
-        a=x(2);
-    end
-end
-yhat=M*a+A*dx;
-ehat=y-yhat;
-A'*ehat;
+% %periods
+% T = [1 0.5 1+50/60/24 (1+50/60/24)/2 167 334];
+% T=[334];
+% t = datenum(data.Gravity_cal1Tides1.time(~idx) )- datenum(data.Gravity_cal1Tides1.time(1) );
+% [P,f]=plomb(final.gravity_values(~idx,1),t);
+% figure()
+% semilogy(f,P)
+% axis([0 5 0 inf])
+% xlabel('frequency [cpd]')
+% ylabel('power spectral density')
+% for j =1:1
+% y=final.gravity_values(~idx,j);
+% for i=1:length(T)
 %     %linearized adjustment for the different frequencies
-%     x=[0; 0.5];
+%     x=[0; 0.2];
 %     M=sin(2*pi/T(i)*t+x(1));
 %     A=[cos(2*pi/T(i)*t+x(1))*x(2) sin(2*pi/T(i)*t+x(1))];
 %     while true
@@ -165,45 +195,37 @@ A'*ehat;
 %         if(norm(dx)<1e-8)
 %             break
 %         else
-%             x=xhat;
+%             x=xhat
 %         end
 %     end
 %     yhat=M*x(2)+A*dx;
 %     ehat=y-yhat;
 %     y=ehat;
-    %i
-%     figure()
-%     plot(final.time(~idx),y)
-%     ylabel('gravity values in [\muGal]')
-%     title('Calibrated gravity values in \muGal after eliminating tidal frequencies')
-end
-final.gravity_values(~idx,j)=y;
-end
-figure()
-Y = fft(final.gravity_values(~idx,1));
-frequency = 1;
-T=1/frequency;
-L=length(final.gravity_values(~idx,1));
-t1=(0:L-1)*T;
-P2=abs(Y/L);
-P1 = P2(1:L/2+1);
-P1(2:end-1) = 2*P1(2:end-1);
-f = frequency*(0:(L/2))/L;
-semilogy(f*60*24,P1)
-xlabel('frequency [cpd]')
-ylabel('power')
-axis([0 10 1e-3 1])
-figure()
-plot(final.time,final.gravity_values)
-ylabel('gravity values in [\muGal]')
-title('Calibrated gravity values in \muGal after eliminating tidal frequencies')
-% A = [t...
-%     cos(2*pi/T1*t) sin(2*pi/T1*t)...
-%     cos(2*pi/T2*t) sin(2*pi/T2*t)...
-%     cos(2*pi/T3*t) sin(2*pi/T3*t)...
-%     cos(2*pi/T4*t) sin(2*pi/T4*t)];
+% end
+% final.gravity_values(~idx,j)=y;
+% end
+% figure(4)
+% hold on
+% plot(t,M*x(2))
+% hold off
+% [P,f]=plomb(ehat,t);
+% figure()
+% semilogy(f,P)
+% axis([0 5 -inf inf])
+% xlabel('frequency [cpd]')
+% ylabel('power spectral density')
 % 
-% par = (A'*A)\A'*data.Gravity_cal1Tides1.G1_F60;
+% figure()
+% plot(final.time,final.gravity_values)
+% ylabel('gravity values in [\muGal]')
+% title('Calibrated gravity values in \muGal after eliminating tidal frequencies')
+% % A = [t...
+% %     cos(2*pi/T1*t) sin(2*pi/T1*t)...
+% %     cos(2*pi/T2*t) sin(2*pi/T2*t)...
+% %     cos(2*pi/T3*t) sin(2*pi/T3*t)...
+% %     cos(2*pi/T4*t) sin(2*pi/T4*t)];
+% % 
+% % par = (A'*A)\A'*data.Gravity_cal1Tides1.G1_F60;
 %% drift
 ...
 
