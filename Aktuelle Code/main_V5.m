@@ -1,7 +1,7 @@
 clear all
 close all
 clc
-%addpath BFO_data
+%addpath BFO_data/Soil_Moisture
 load data2.mat
 
 %% Initialize the final result
@@ -146,8 +146,22 @@ grid on
 
 run GRACE_data.m
 
+%compare GRACE values with SG
+figure(12)
+scatter(Grseries*1e3-mean(Grseries*1e3),monthly_means(1:10),'filled')
+xlabel('GRACE gravity residual [\muGal]')
+ylabel('average SG gravity residual [\muGal]')
+axis([-2 2.5 -4 4])
+
+%without Love number correction
+figure(13)
+scatter(Grnoloveseries*1e3-mean(Grnoloveseries*1e3),monthly_means(1:10),'filled')
+xlabel('GRACE gravity residual [\muGal] (without Love number)')
+ylabel('average SG gravity residual [\muGal]')
+axis([-2 2.5 -4 4])
+
 %% Soil Moisture
-SMSolidus1 = loadSM("G:\Project_Hydro\BFO_data\Soil_Moisture\SMT100DataSolidus1.csv");
+SMSolidus1 = loadSM("BFO_data\Soil_Moisture\SMT100DataSolidus1.csv");
 figure(10),
 plot(data.Raw.Soil_Moisture.SMT100DataSolidus1.time ,SMSolidus1{1, 3}  )
 ylabel('Soil Moisture [%]')
@@ -155,6 +169,24 @@ title("SMT100DataSolidus1")
 
 SM = interp1(seconds(data.Raw.Soil_Moisture.SMT100DataSolidus1.time -...
     data.Raw.Soil_Moisture.SMT100DataSolidus1.time(1)),SMSolidus1{1, 3},seconds(final.time_temp-final.time_temp(1)));
+
+%Compare Gravity residuals and SM
+figure(14)
+%scatter(SM(SM>0),final.gravity_values(SM>0),2)
+SMnum=SM(~isnan(final.gravity_values(:,1)));
+Gravnum=final.gravity_values(~isnan(final.gravity_values(:,1)),1);
+dscatter(SMnum(SMnum>0),Gravnum(SMnum>0));
+xlabel('soil moisture [%]')
+ylabel('gravity residual [\muGal')
+axis tight
+
+figure(15)
+yyaxis left
+plot(final.time,final.gravity_values(:,1))
+ylabel('gravity residual [\muGal]')
+yyaxis right
+plot(final.time,SM)
+ylabel('soil moisture [%]')
 
 %% Pre
 len = length(data.Raw.Precipitation.pre)/60;
@@ -167,6 +199,7 @@ plot(time_hour,pre_hour,'LineWidth',2,'color','b')
 ylabel('Precipitation in mm/hour')
 
 
+
 %% Final
 function data=insert(mat,ind,num)
 n=length(mat);
@@ -174,4 +207,5 @@ data(ind)=num;
 data(1:ind-1)=mat(1:ind-1);
 data(ind+1:n+1)=mat(ind:n);
 end
+
 
