@@ -1,6 +1,6 @@
 addpath GRACE_data
 addpath SHbundle-master
-addpath uberall-master
+%addpath uberall-master
 %% read data: GRACE-FO
 d = dir('GRACE_data\CSR_CSR-Release-06-GFO_96x96_unfiltered\*.gfc');
 path = 'GRACE_data\CSR_CSR-Release-06-GFO_96x96_unfiltered\';
@@ -153,6 +153,8 @@ for i = 1:length(GRACE)
 
     Grseries(i)=-gshs_ptw(sc,SG_Lon,SG_Lat,r,r,'quant',...
         'tr','sub_WGS84',false,'GM',GM);
+    Grnoloveseries(i)=-gshs_ptwnolove(sc,SG_Lon,SG_Lat,r,r,'quant',...
+        'tr','sub_WGS84',false,'GM',GM);
 end
 
 figure
@@ -160,7 +162,14 @@ t = datetime([GRACE_tyear GRACE_tmonth ones(length(GRACE_tmonth),1)]);
 plot(t,(Grseries-mean(Grseries))*1e3,'-o','LineWidth',1)
 title('Monthly timeseries of gravity disturbances (minus the average) captured by GRACE Follow-On','FontSize',20)
 ylabel('gravity residuals [\muGal]')
+ylim([-2 2.5])
+%axis([-inf inf -2 2.5])
 
-
-
+figure
+t = datetime([GRACE_tyear GRACE_tmonth ones(length(GRACE_tmonth),1)]);
+plot(t,(Grnoloveseries-mean(Grnoloveseries))*1e3,'-o','LineWidth',1)
+title('Monthly timeseries of gravity disturbances (minus the average) captured by GRACE Follow-On','FontSize',20)
+ylabel('gravity residuals [\muGal] (without Love numbers)')
+ylim([-2 2.5])
+%axis([-inf inf -2 2.5])
 
