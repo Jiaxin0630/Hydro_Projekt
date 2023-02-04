@@ -151,7 +151,8 @@ plot(time_hour,pre_hour,'LineWidth',2,'color','b')
 ylabel('Precipitation in mm/hour')
 
 
-
+%computing means for comparison with GRACE
+[monthly_means, daily_means] = GravityResMeans(final.gravity_values,data.Raw.SG.Br2_F60);
 
 %% Final
 figure(8),
