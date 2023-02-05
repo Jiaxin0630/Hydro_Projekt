@@ -1,8 +1,11 @@
 clear all
 close all
 clc
+addpath C:\Users\Jiaxin\Desktop\Hydro_Projekt
+addpath C:\Users\Jiaxin\Desktop\Hydro_Projekt\SHbundle-master
+addpath C:\Users\Jiaxin\Desktop\Hydro_Projekt\uberall-master
 %addpath BFO_data/Soil_Moisture
-load data2.mat
+load C:\Users\Jiaxin\Desktop\Hydro_Projekt\data2.mat
 
 %% Initialize the final result
 % ----------------------------------------------------------
@@ -62,15 +65,51 @@ final.gravity_values(:,2)=final.gravity_values(:,2)-data.Raw.Synthetic_Tides.Tid
     data.Raw.Synthetic_Tides.LODTide(1:idxx)/10;
 
 final.gravity_values = final.gravity_values - nanmean(final.gravity_values);
+%% AR
+mp=mean(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900));
+figure(16)
+scatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_values(data.Raw.SG.Br2_F60>900,1),1,'filled')
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+figure(17)
+scatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_values(data.Raw.SG.Br2_F60>900,2),1,'filled')
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+
+figure(18)
+co1=dscatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_values(data.Raw.SG.Br2_F60>900,1));
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+figure(19)
+co2 = dscatter(data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-...
+    mp,final.gravity_values(data.Raw.SG.Br2_F60>900,2));
+xlabel('pressure [hPa] - mean')
+ylabel('gravity [\muGal] - mean')
+axis([-inf inf -7 7])
+
+Co1 = speye(length(co1));Co2 = speye(length(co2));
+P1 = spdiags(co1,0,Co1);P2 = spdiags(co2,0,Co2);
+
+A=data.Raw.SG.Br2_F60(data.Raw.SG.Br2_F60>900)-mp;
+y1=final.gravity_values(data.Raw.SG.Br2_F60>900,1);
+y2=final.gravity_values(data.Raw.SG.Br2_F60>900,2);
+par1 = inv(A'*P1*A)*A'*P1*y1
+par2 = inv(A'*P1*A)*A'*P2*y2
 
 %% Correcting the influence of atmospheric pressure
+
 data.Raw.Atmos.time = data.Raw.SG.time;
 data.Raw.Atmos.cor = data.Raw.SG.PRESSURE_ADMIT_HPA_NMS2*1e-1*(data.Raw.SG.Br2_F60);
 idx = data.Raw.Atmos.cor == 0;
 final.gravity_values(idx,:) = NaN;
 final.gravity_values = final.gravity_values - data.Raw.Atmos.cor;
 final.gravity_values = final.gravity_values - nanmean(final.gravity_values);
-legend("G1-F60","G2-F60")
 % ----------------------------------------------------------
 figure(5),
 plot(final.time,final.gravity_values)
@@ -119,6 +158,7 @@ diffG1G2 = final.gravity_values_temp(:,1) - final.gravity_values_temp(:,2);
 p = polyfit(seconds(final.time_temp-final.time_temp(1)),diffG1G2,1);
 drift = seconds(final.time_temp-final.time_temp(1))*p(1);
 final.gravity_values_temp(:,2) = final.gravity_values_temp(:,2) + drift;
+
 
 %% Final
 idxxx = setdiff(final.time,final.time_temp);
@@ -200,12 +240,5 @@ ylabel('Precipitation in mm/hour')
 
 
 
-%% Final
-function data=insert(mat,ind,num)
-n=length(mat);
-data(ind)=num;
-data(1:ind-1)=mat(1:ind-1);
-data(ind+1:n+1)=mat(ind:n);
-end
 
 
